@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { supabase, isConfigured } from './supabaseClient'
 import { useSession } from './hooks/useSession'
 import { NameForm } from './components/NameForm'
 import { VotingPage } from './components/VotingPage'
 import { ResultsPage } from './components/ResultsPage'
+import ResultsRoute from './pages/ResultsRoute'
 
 const Spinner = () => (
   <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] text-zinc-400">
@@ -30,7 +32,12 @@ export default function App() {
     )
   }
 
-  return <AppInner />
+  return (
+    <Routes>
+      <Route path="/results" element={<ResultsRoute />} />
+      <Route path="*" element={<AppInner />} />
+    </Routes>
+  )
 }
 
 function AppInner() {

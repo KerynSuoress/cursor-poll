@@ -1,13 +1,34 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { AIPanel } from './AIPanel'
+import { useSession } from '../hooks/useSession'
 
 const REFRESH_MS = 10_000
 
-export function ResultsPage({ onSignOut }) {
+const Spinner = () => (
+  <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] text-zinc-400">
+    <span
+      className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-500"
+      aria-label="Loading"
+    />
+  </div>
+)
+
+export default function ResultsRoute() {
+  const { session, loading: sessionLoading } = useSession()
+  const [authReady, setAuthReady] = useState(false)
   const [rows, setRows] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  // Silently sign in anonymously if there is no session so the RPC works
+  useEffect(() => {
+    if (sessionLoading) return
+    if (session?.user) {
+      setAuthReady(true)
+      return
+    }
+    supabase.auth.signInAnonymously().then(() => setAuthReady(true))
+  }, [session, sessionLoading])
 
   const fetchResults = useCallback(async () => {
     setError(null)
@@ -30,24 +51,17 @@ export function ResultsPage({ onSignOut }) {
   }, [])
 
   useEffect(() => {
+    if (!authReady) return
     fetchResults()
-  }, [fetchResults])
+  }, [authReady, fetchResults])
 
   useEffect(() => {
+    if (!authReady) return
     const id = window.setInterval(fetchResults, REFRESH_MS)
     return () => window.clearInterval(id)
-  }, [fetchResults])
+  }, [authReady, fetchResults])
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] text-zinc-400">
-        <span
-          className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-500"
-          aria-label="Loading"
-        />
-      </div>
-    )
-  }
+  if (sessionLoading || !authReady || loading) return <Spinner />
 
   if (error) {
     return (
@@ -63,10 +77,10 @@ export function ResultsPage({ onSignOut }) {
     <div className="mx-auto min-h-screen max-w-2xl bg-[#0a0a0a] px-4 py-10">
       <header className="mb-10 text-center">
         <h1 className="text-xl font-semibold text-white sm:text-2xl">
-          Results — Thank you for voting!
+          Live Results
         </h1>
         <p className="mt-2 text-sm text-zinc-400">
-          Live averages (updates every {REFRESH_MS / 1000}s).{' '}
+          Updates every {REFRESH_MS / 1000}s.{' '}
           {totalVoters > 0 && (
             <span className="text-zinc-500">
               {totalVoters} {totalVoters === 1 ? 'response' : 'responses'} so far
@@ -105,18 +119,6 @@ export function ResultsPage({ onSignOut }) {
           </li>
         ))}
       </ul>
-      {rows.length > 0 && <AIPanel rows={rows} />}
-
-      <p className="mt-10 text-center text-xs text-zinc-600">
-        Not you?{' '}
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="text-zinc-400 underline hover:text-white"
-        >
-          Sign out
-        </button>
-      </p>
     </div>
   )
 }
