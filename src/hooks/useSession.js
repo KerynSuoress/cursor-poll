@@ -8,12 +8,16 @@ export function useSession() {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (mounted) {
-        setSession(s)
-        setLoading(false)
-      }
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session: s } }) => {
+        if (mounted) {
+          setSession(s)
+          setLoading(false)
+        }
+      })
+      .catch(() => {
+        if (mounted) setLoading(false)
+      })
 
     const {
       data: { subscription },

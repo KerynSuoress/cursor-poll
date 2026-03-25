@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 
+const NAME_MAX = 80
+
 export function NameForm() {
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,7 +28,11 @@ export function NameForm() {
         { id: user.id, name: trimmed },
         { onConflict: 'id' }
       )
-      if (profileError) throw profileError
+      if (profileError) {
+        // Roll back the anonymous session so the user can try again cleanly.
+        await supabase.auth.signOut()
+        throw profileError
+      }
     } catch (err) {
       console.error(err)
       setError(err.message ?? 'Something went wrong. Try again.')
@@ -36,7 +42,7 @@ export function NameForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
+    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center bg-[#0a0a0a] px-4 py-12">
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-xl">
         <div className="mb-8 text-center">
           <p className="text-2xl font-semibold tracking-tight text-white">
@@ -60,6 +66,7 @@ export function NameForm() {
               autoComplete="name"
               placeholder="Enter your name to vote"
               value={name}
+              maxLength={NAME_MAX}
               onChange={(e) => setName(e.target.value)}
               disabled={loading}
               className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-60"

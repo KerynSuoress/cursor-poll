@@ -3,53 +3,28 @@ import { supabase } from '../supabaseClient'
 
 const REFRESH_MS = 10_000
 
-export function ResultsPage() {
+export function ResultsPage({ onSignOut }) {
   const [rows, setRows] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const fetchResults = useCallback(async () => {
     setError(null)
-    const { data: questions, error: qErr } = await supabase
-      .from('questions')
-      .select('id, text, order_index')
-      .order('order_index', { ascending: true })
-    if (qErr) {
-      setError(qErr.message)
+    const { data, error: rpcErr } = await supabase.rpc('get_vote_averages')
+    if (rpcErr) {
+      setError(rpcErr.message)
       setRows([])
       setLoading(false)
       return
     }
-
-    const { data: votes, error: vErr } = await supabase
-      .from('votes')
-      .select('question_id, score')
-    if (vErr) {
-      setError(vErr.message)
-      setRows([])
-      setLoading(false)
-      return
-    }
-
-    const byQ = {}
-    for (const v of votes ?? []) {
-      if (!byQ[v.question_id]) byQ[v.question_id] = []
-      byQ[v.question_id].push(v.score)
-    }
-
-    const computed = (questions ?? []).map((q) => {
-      const list = byQ[q.id] ?? []
-      const count = list.length
-      const avg =
-        count === 0 ? 0 : list.reduce((a, b) => a + b, 0) / count
-      return {
-        id: q.id,
-        text: q.text,
-        avg: Number(avg.toFixed(1)),
-        count,
-      }
-    })
-    setRows(computed)
+    setRows(
+      (data ?? []).map((r) => ({
+        id: r.id,
+        text: r.text,
+        avg: Number(Number(r.avg_score).toFixed(1)),
+        count: Number(r.vote_count),
+      }))
+    )
     setLoading(false)
   }, [])
 
@@ -64,7 +39,7 @@ export function ResultsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-zinc-400">
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] text-zinc-400">
         <span
           className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-500"
           aria-label="Loading"
@@ -81,19 +56,19 @@ export function ResultsPage() {
     )
   }
 
-  const totalVotes = rows.reduce((m, r) => Math.max(m, r.count), 0)
+  const totalVoters = rows.reduce((m, r) => Math.max(m, r.count), 0)
 
   return (
-    <div className="mx-auto min-h-screen max-w-2xl px-4 py-10">
+    <div className="mx-auto min-h-screen max-w-2xl bg-[#0a0a0a] px-4 py-10">
       <header className="mb-10 text-center">
         <h1 className="text-xl font-semibold text-white sm:text-2xl">
           Results — Thank you for voting!
         </h1>
         <p className="mt-2 text-sm text-zinc-400">
           Live averages (updates every {REFRESH_MS / 1000}s).{' '}
-          {totalVotes > 0 && (
+          {totalVoters > 0 && (
             <span className="text-zinc-500">
-              Max responses on any question: {totalVotes}
+              {totalVoters} {totalVoters === 1 ? 'response' : 'responses'} so far
             </span>
           )}
         </p>
@@ -129,6 +104,16 @@ export function ResultsPage() {
           </li>
         ))}
       </ul>
+      <p className="mt-10 text-center text-xs text-zinc-600">
+        Not you?{' '}
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="text-zinc-400 underline hover:text-white"
+        >
+          Sign out
+        </button>
+      </p>
     </div>
   )
 }

@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { QuestionCard } from './QuestionCard'
 
-export function VotingPage({ userId, onSubmitted }) {
+const FEEDBACK_MAX = 1000
+
+export function VotingPage({ userId, onSubmitted, onSignOut }) {
   const [questions, setQuestions] = useState([])
   const [scores, setScores] = useState({})
+  const [feedback, setFeedback] = useState('')
   const [loadError, setLoadError] = useState(null)
   const [submitError, setSubmitError] = useState(null)
   const [loadingQuestions, setLoadingQuestions] = useState(true)
@@ -51,10 +54,20 @@ export function VotingPage({ userId, onSubmitted }) {
         question_id: q.id,
         score: scores[q.id],
       }))
-      const { error } = await supabase.from('votes').upsert(rows, {
+      const { error: votesError } = await supabase.from('votes').upsert(rows, {
         onConflict: 'user_id,question_id',
       })
-      if (error) throw error
+      if (votesError) throw votesError
+
+      const trimmedFeedback = feedback.trim()
+      if (trimmedFeedback) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ feedback: trimmedFeedback })
+          .eq('id', userId)
+        if (profileError) throw profileError
+      }
+
       onSubmitted?.()
     } catch (err) {
       console.error(err)
@@ -66,7 +79,7 @@ export function VotingPage({ userId, onSubmitted }) {
 
   if (loadingQuestions) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-zinc-400">
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] text-zinc-400">
         <span
           className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-500"
           aria-label="Loading"
@@ -86,8 +99,19 @@ export function VotingPage({ userId, onSubmitted }) {
     )
   }
 
+  if (questions.length === 0) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <p className="text-zinc-400">No questions available yet.</p>
+        <p className="mt-2 text-sm text-zinc-500">
+          Make sure schema.sql has been applied in the Supabase SQL editor.
+        </p>
+      </div>
+    )
+  }
+
   return (
-    <div className="mx-auto min-h-screen max-w-2xl px-4 py-10">
+    <div className="mx-auto min-h-screen max-w-2xl bg-[#0a0a0a] px-4 py-10">
       <header className="mb-10 text-center">
         <h1 className="text-xl font-semibold text-white sm:text-2xl">
           Cursor Conference 2026 — Share Your Feedback
@@ -105,6 +129,30 @@ export function VotingPage({ userId, onSubmitted }) {
             onChange={setScore}
           />
         ))}
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <label
+            htmlFor="feedback"
+            className="mb-3 block text-sm font-medium text-white"
+          >
+            Any other thoughts or suggestions for future events?{' '}
+            <span className="font-normal text-zinc-500">(optional)</span>
+          </label>
+          <textarea
+            id="feedback"
+            rows={4}
+            maxLength={FEEDBACK_MAX}
+            placeholder="Share any comments, ideas, or suggestions…"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            disabled={submitting}
+            className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-60"
+          />
+          <p className="mt-1 text-right text-xs text-zinc-600">
+            {feedback.length}/{FEEDBACK_MAX}
+          </p>
+        </div>
+
         {submitError && (
           <p className="text-center text-sm text-red-400" role="alert">
             {submitError}
@@ -117,6 +165,16 @@ export function VotingPage({ userId, onSubmitted }) {
         >
           {submitting ? 'Submitting…' : 'Submit votes'}
         </button>
+        <p className="text-center text-xs text-zinc-600">
+          Wrong person?{' '}
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="text-zinc-400 underline hover:text-white"
+          >
+            Sign out
+          </button>
+        </p>
       </form>
     </div>
   )
