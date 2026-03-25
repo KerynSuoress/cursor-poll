@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  @apply min-h-full bg-[#0a0a0a] text-white antialiased;
+}
+
+body {
+  margin: 0;
+}
