@@ -5,7 +5,17 @@ async function callClaude(messages, system) {
   const { data, error } = await supabase.functions.invoke('claude-chat', {
     body: { messages, system },
   })
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Extract the real error body from the response
+    let detail = error.message
+    try {
+      const body = await error.context?.json?.()
+      if (body?.error) detail = body.error
+    } catch {
+      // ignore parse failure
+    }
+    throw new Error(detail)
+  }
   if (data?.error) throw new Error(data.error)
   const text = data?.content?.[0]?.text
   if (!text) throw new Error('Empty response from Claude.')
